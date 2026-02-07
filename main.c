@@ -1,8 +1,31 @@
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <unistd.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#define BUFF_MAX 80
+
+void client_handler(int conn) {
+    char buff[BUFF_MAX];
+
+    // Infinite loop for client handling
+    for (;;) {
+        int bytes = read(conn, buff, BUFF_MAX - 1);
+        if (bytes <= 0) {
+            printf("Client disconnected\n");
+            break;
+        }
+        
+        buff[bytes] = '\0';
+        printf("From client: %s", buff);
+        
+        write(conn, buff, bytes); // echo
+        
+        if (strncmp(buff, "exit", 4) == 0)
+            break;
+    }
+}
 
 int main() {
     // Initializing socket and error handling
@@ -10,8 +33,6 @@ int main() {
     if (sock < 0) {
         perror("Socket initializing error");
         return 1;
-    } else {
-        printf("Socket ready to work!\n");
     }
 
     struct sockaddr_in server_address;
@@ -35,12 +56,18 @@ int main() {
             perror("listen");
             close(sock);
             return 1;
+        } else {
+            printf("Server socket bound and listening on port %d...\n", htons(server_address.sin_port));
         }
-    
-    printf("Server socket bound and listening on port %d...\n", htons(server_address.sin_port));
 
-    while (1) {
-        sleep(1);
+    for (;;) {
+        int client = accept(sock, NULL, NULL);
+        if (client < 0) {
+            perror("accept");
+            continue;
+        }
+        
+        client_handler(client);
     }
     
     // Closing socket
